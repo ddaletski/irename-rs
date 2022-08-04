@@ -1,14 +1,17 @@
-use std::path::PathBuf;
+use std::{env::split_paths, path::PathBuf};
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Margin},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
+    text::{Span, Spans, Text},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
+
+use crate::path_utils;
 
 pub struct App {
     /// Current value of the regex input box
@@ -25,9 +28,19 @@ impl Default for App {
     }
 }
 
+fn split_path(mut path: PathBuf) -> (PathBuf, String) {
+    let filename = path.file_name().unwrap().to_str().unwrap().into();
+    path.pop();
+
+    (path, filename)
+}
+
 impl App {
     pub fn with_files(mut self, files: Vec<PathBuf>) -> Self {
-        self.source_files = files;
+        self.source_files = files
+            .into_iter()
+            .map(|path| path_utils::normalize_path(&path))
+            .collect();
         self
     }
 
@@ -86,10 +99,26 @@ impl App {
 
         let items: Vec<ListItem> = self
             .source_files
-            .iter()
-            .filter_map(|file_path| file_path.file_name())
-            .filter_map(|name_os_str| name_os_str.to_str())
-            .map(|name| ListItem::new(name))
+            .clone()
+            .into_iter()
+            .map(split_path)
+            .map(|(parent, name)| {
+                let dir_str = parent.to_str().unwrap().to_owned() + "/";
+                let dir_style = Style::default();
+
+                let src_name_style = Style::default().fg(Color::Red);
+                let dst_name_style = Style::default().fg(Color::Green);
+
+                let dst_name = name.clone();
+
+                Spans::from(vec![
+                    Span::styled(dir_str, dir_style),
+                    Span::styled(name, src_name_style),
+                    Span::raw("->"),
+                    Span::styled(dst_name, dst_name_style),
+                ])
+            })
+            .map(|lines| ListItem::new(lines))
             .collect();
 
         let files_view =
@@ -99,4 +128,17 @@ impl App {
         let side_pane = Block::default().title("Help").borders(Borders::ALL);
         frame.render_widget(side_pane, hor_layout[1]);
     }
+}
+
+#[cfg(test)]
+mod tests {
+    //#[rstest]
+    //def test_split_path() {
+    //}
+
+    //fn split_path(path: PathBuf) -> (PathBuf, String) {
+    //let filename = path.file_name().unwrap().to_str().unwrap().into();
+    //path.pop();
+
+    //(path, filename)
 }
