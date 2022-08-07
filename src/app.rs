@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::path::PathBuf;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
@@ -5,7 +6,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Margin},
-    style::{Color, Style},
+    style::{Color, Style, Modifier},
     text::{Span, Spans},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
@@ -41,8 +42,11 @@ impl EditableArea {
 pub struct App {
     /// Current value of the regex input box
     regex: String,
+    /// Current value of the replacement string box
     replacement: String,
+    /// active editing area where the cursor is
     active_area: EditableArea,
+    /// source files to rename
     source_files: Vec<PathBuf>,
 }
 
@@ -50,20 +54,10 @@ impl Default for App {
     fn default() -> App {
         App {
             regex: String::new(),
-            replacement: "\\0".into(),
+            replacement: String::new(),
             active_area: EditableArea::Regex,
             source_files: Vec::new(),
         }
-    }
-}
-
-fn split_path(mut path: PathBuf) -> (PathBuf, Option<String>) {
-    match path.file_name().map(|s| s.to_owned()) {
-        Some(name) => {
-            path.pop();
-            (path, Some(name.to_str().unwrap().to_owned()))
-        }
-        None => (path, None),
     }
 }
 
@@ -78,6 +72,11 @@ impl App {
 
     pub fn with_regex(mut self, regex: String) -> Self {
         self.regex = regex;
+        self
+    }
+
+    pub fn with_replacement(mut self, replacement: String) -> Self {
+        self.replacement = replacement;
         self
     }
 
@@ -116,7 +115,7 @@ impl App {
         }
     }
 
-    pub fn ui<B: Backend>(&self, frame: &mut Frame<B>) {
+    fn ui<B: Backend>(&self, frame: &mut Frame<B>) {
         // editor and help areas
         let main_layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -168,27 +167,46 @@ impl App {
             }
         }
 
+        let re = Regex::new(&self.regex).ok();
+
         let items: Vec<ListItem> = self
             .source_files
             .clone()
             .into_iter()
-            .map(split_path)
+            .map(path_utils::split_path)
             .filter_map(|(parent, name)| name.map(|name| (parent, name)))
             .map(|(parent, name)| {
-                let dir_str = parent.to_str().unwrap().to_owned() + "/";
-                let dir_style = Style::default();
-
+                let dir_style = Style::default().add_modifier(Modifier::BOLD);
                 let src_name_style = Style::default().fg(Color::Red);
                 let dst_name_style = Style::default().fg(Color::Green);
 
-                let dst_name = name.clone();
+                let dir_str = parent.to_str().unwrap().to_owned() + "/";
 
-                Spans::from(vec![
-                    Span::styled(dir_str, dir_style),
-                    Span::styled(name, src_name_style),
-                    Span::raw("->"),
-                    Span::styled(dst_name, dst_name_style),
-                ])
+                // TODO: refactor with helper function returning enum of is_match/replace state
+                // and handle it with match {} block
+                if let Some(re) = re.as_ref() {
+                    if re.is_match(&name) {
+                        let dst_name: String = re.replace(&name, &self.replacement).into();
+
+                        if dst_name != name {
+                            Spans::from(vec![
+                                Span::styled(dir_str, dir_style),
+                                Span::styled(name, src_name_style),
+                                Span::raw("->"),
+                                Span::styled(dst_name, dst_name_style),
+                            ])
+                        } else {
+                            Spans::from(vec![
+                                Span::styled(dir_str, dir_style),
+                                Span::styled(name, dst_name_style),
+                            ])
+                        }
+                    } else {
+                        Spans::from(vec![Span::styled(dir_str, dir_style), Span::from(name)])
+                    }
+                } else {
+                    Spans::from(vec![Span::styled(dir_str, dir_style), Span::from(name)])
+                }
             })
             .map(ListItem::new)
             .collect();
@@ -204,9 +222,6 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use proptest::prop_assert_eq;
-    use proptest::proptest;
-
     use super::*;
     use rstest::rstest;
 
@@ -227,32 +242,6 @@ mod tests {
         fn prev(#[case] current_area: EditableArea, #[case] expected_next_area: EditableArea) {
             let next_area = current_area.prev();
             assert_eq!(next_area, expected_next_area);
-        }
-    }
-
-    mod split_path {
-        use super::*;
-
-        proptest! {
-            #[test]
-            fn splittable(dir_str in "([.]{0,2}/)?((([0-9a-zA-Z_]+)|([.]{1,2}))/)*", expected_filename in "[0-9a-zA-Z_]+") {
-                let expected_dir = PathBuf::from(dir_str);
-                let src_path = expected_dir.join(PathBuf::from(expected_filename.clone()));
-
-                let (dir, filename) = split_path(src_path);
-
-                prop_assert_eq!(dir, expected_dir);
-                prop_assert_eq!(filename, Some(expected_filename));
-            }
-
-            #[test]
-            fn unsplittable(path in "([.]{0,2})/?") {
-                let expected_dir = PathBuf::from(path);
-                let (dir, filename) = split_path(expected_dir.clone());
-
-                prop_assert_eq!(dir, expected_dir);
-                prop_assert_eq!(filename, None);
-            }
         }
     }
 }
