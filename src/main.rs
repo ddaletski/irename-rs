@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // run the app
     let mut app = App::default()
         .with_files(args.files)
-        .with_regex(args.regex.unwrap_or(String::new()));
+        .with_regex(args.regex.unwrap_or_default());
 
     let res = app.run(&mut terminal);
 

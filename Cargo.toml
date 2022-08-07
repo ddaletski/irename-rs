@@ -8,5 +8,10 @@ edition = "2021"
 [dependencies]
 clap = { version = "3.2.16", features = ["derive"] }
 crossterm = "0.24.0"
+num = "0.4.0"
+num-derive = "0.3.3"
+num-traits = "0.2.15"
+proptest = "1.0.0"
 rstest = "0.15.0"
 tui = "0.18.0"
+variant_count = "1.1.0"
