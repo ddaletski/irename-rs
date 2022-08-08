@@ -60,3 +60,4 @@ OPTIONS:
 - [ ] Highlight for conflicting names
 - [ ] Help side-pane
 - [ ] Full-path mode switch for editing the whole path instead of just filename
+- [ ] Docs
