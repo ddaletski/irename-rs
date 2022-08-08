@@ -39,6 +39,7 @@ impl EditableArea {
     }
 }
 
+#[derive(Debug, PartialEq)]
 enum ReplacementResult {
     InvalidRegex,
     EmptyRegex,
@@ -56,7 +57,7 @@ fn try_replace(text: &str, regex: &Option<Regex>, replacement: &str) -> Replacem
         } else {
             let replaced = regex.replace(text, replacement);
 
-            if replacement == text {
+            if replaced == text {
                 ReplacementResult::Unchanged
             } else {
                 ReplacementResult::Replaced(replaced.into())
@@ -264,5 +265,21 @@ mod tests {
             let next_area = current_area.prev();
             assert_eq!(next_area, expected_next_area);
         }
+    }
+
+    #[rstest]
+    #[case("a", None, "b", ReplacementResult::InvalidRegex)]
+    #[case("a", Regex::new("").ok(), "b", ReplacementResult::EmptyRegex)]
+    #[case("abc", Regex::new("bc").ok(), "bc", ReplacementResult::Unchanged)]
+    #[case("abc", Regex::new("b").ok(), "f", ReplacementResult::Replaced("afc".into()))]
+    #[case("abc", Regex::new("(ab)(.*)").ok(), "$2$1", ReplacementResult::Replaced("cab".into()))]
+    fn try_replace_works(
+        #[case] text: &str,
+        #[case] regex: Option<Regex>,
+        #[case] replacement: &str,
+        #[case] expected_result: ReplacementResult,
+    ) {
+        let replacement_result = try_replace(text, &regex, replacement);
+        assert_eq!(replacement_result, expected_result);
     }
 }
