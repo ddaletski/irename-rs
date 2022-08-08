@@ -9,8 +9,11 @@ pub struct Args {
     #[clap(required = true)]
     pub files: Vec<PathBuf>,
 
-    #[clap(long, help="Initial replacement regex")]
+    #[clap(long, help="Initial regex")]
     pub regex: Option<String>,
+
+    #[clap(long, help="Initial replacement string")]
+    pub replace: Option<String>,
 
     #[clap(long, action, help="only print shell commands w/o executing them")]
     pub dry_run: bool

@@ -1,5 +1,5 @@
-use irn::app::{App, AppResult};
-use irn::cli::parse_args;
+use irename::app::{App, AppResult};
+use irename::cli::parse_args;
 
 use std::collections::HashSet;
 
@@ -26,15 +26,16 @@ fn main() -> anyhow::Result<()> {
 
     // setup terminal
     enable_raw_mode()?;
-    let mut stdout = std::io::stdout();
-    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
+    let mut stderr = std::io::stderr();
+    crossterm::execute!(stderr, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stderr);
     let mut terminal = Terminal::new(backend)?;
 
     // run the app
     let mut app = App::default()
         .with_files(args.files)
-        .with_regex(args.regex.unwrap_or_default());
+        .with_regex(args.regex.unwrap_or_default())
+        .with_replacement(args.replace.unwrap_or_default());
 
     let res = app.run(&mut terminal);
 

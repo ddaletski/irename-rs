@@ -315,7 +315,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "irn"
+name = "irename"
 version = "0.1.0"
 dependencies = [
  "anyhow",
