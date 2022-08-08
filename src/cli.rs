@@ -10,7 +10,10 @@ pub struct Args {
     pub files: Vec<PathBuf>,
 
     #[clap(long, help="Initial replacement regex")]
-    pub regex: Option<String>
+    pub regex: Option<String>,
+
+    #[clap(long, action, help="only print shell commands w/o executing them")]
+    pub dry_run: bool
 }
 
 pub fn parse_args() -> Args {

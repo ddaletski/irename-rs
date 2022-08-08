@@ -1,8 +1,10 @@
-use regex::Regex;
+use crate::path_utils;
+
 use std::path::PathBuf;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-
+use num_derive::{FromPrimitive, ToPrimitive};
+use regex::Regex;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Margin},
@@ -11,11 +13,7 @@ use tui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
-
-use num_derive::{FromPrimitive, ToPrimitive};
 use variant_count::VariantCount;
-
-use crate::path_utils;
 
 #[derive(Debug, PartialEq, FromPrimitive, ToPrimitive, VariantCount)]
 enum EditableArea {
@@ -68,6 +66,11 @@ fn try_replace(text: &str, regex: &Option<Regex>, replacement: &str) -> Replacem
     }
 }
 
+pub enum AppResult {
+    MoveFiles(Vec<(PathBuf, PathBuf)>),
+    Exit,
+}
+
 pub struct App {
     /// Current value of the regex input box
     regex: String,
@@ -109,14 +112,14 @@ impl App {
         self
     }
 
-    pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> std::io::Result<()> {
+    pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> std::io::Result<AppResult> {
         loop {
             terminal.draw(|f| self.ui(f))?;
 
             if let Event::Key(KeyEvent { code, modifiers }) = crossterm::event::read()? {
                 // ctrl-c handler
                 if code == KeyCode::Char('c') && modifiers == KeyModifiers::CONTROL {
-                    return Ok(());
+                    return Ok(AppResult::Exit);
                 }
 
                 let edited_string = match self.active_area {
@@ -134,6 +137,29 @@ impl App {
                     }
                     KeyCode::Backspace => {
                         edited_string.pop();
+                    }
+                    KeyCode::Enter => {
+                        let re = Regex::new(&self.regex).ok();
+
+                        let move_pairs: Vec<(PathBuf, PathBuf)> = self
+                            .source_files
+                            .clone()
+                            .into_iter()
+                            .filter_map(path_utils::split_path)
+                            .filter_map(|(parent, name)| {
+                                match try_replace(&name, &re, &self.replacement) {
+                                    ReplacementResult::Replaced(dst_name) => {
+                                        let src_path = parent.join(name);
+                                        let dst_path = parent.join(dst_name);
+
+                                        Some((src_path, dst_path))
+                                    }
+                                    _ => None,
+                                }
+                            })
+                            .collect();
+
+                        return Ok(AppResult::MoveFiles(move_pairs));
                     }
                     KeyCode::Char(ch) => {
                         edited_string.push(ch);
@@ -207,8 +233,7 @@ impl App {
             .source_files
             .clone()
             .into_iter()
-            .map(path_utils::split_path)
-            .filter_map(|(parent, name)| name.map(|name| (parent, name)))
+            .filter_map(path_utils::split_path)
             .map(|(parent, name)| {
                 let dir_style = Style::default().add_modifier(Modifier::BOLD);
                 let src_name_style = Style::default().fg(Color::Red);

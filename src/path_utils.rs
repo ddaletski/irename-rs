@@ -34,13 +34,12 @@ pub fn normalize_path(path: &Path) -> PathBuf {
     }
 }
 
-pub fn split_path(mut path: PathBuf) -> (PathBuf, Option<String>) {
-    match path.file_name().map(|s| s.to_owned()) {
-        Some(name) => {
-            path.pop();
-            (path, Some(name.to_str().unwrap().to_owned()))
-        }
-        None => (path, None),
+pub fn split_path(mut path: PathBuf) -> Option<(PathBuf, String)> {
+    if let Some(name) = path.file_name().map(|s| s.to_owned()) {
+        path.pop();
+        Some((path, name.to_str().unwrap().to_owned()))
+    } else {
+        None
     }
 }
 
@@ -56,23 +55,24 @@ mod tests {
 
         proptest! {
             #[test]
-            fn splittable(dir_str in "([.]{0,2}/)?((([0-9a-zA-Z_]+)|([.]{1,2}))/)*", expected_filename in "[0-9a-zA-Z_]+") {
+            fn splittable(dir_str in "([.]{0,2}/)?((([0-9a-zA-Z_]+)|([.]{1,2}))/)*",
+                          expected_filename in "[0-9a-zA-Z_]+") {
+
                 let expected_dir = PathBuf::from(dir_str);
                 let src_path = expected_dir.join(PathBuf::from(expected_filename.clone()));
 
-                let (dir, filename) = split_path(src_path);
+                let (dir, filename) = split_path(src_path.clone())
+                    .expect(&format!("can't split path: {:?}", src_path));
 
                 prop_assert_eq!(dir, expected_dir);
-                prop_assert_eq!(filename, Some(expected_filename));
+                prop_assert_eq!(filename, expected_filename);
             }
 
             #[test]
             fn unsplittable(path in "([.]{0,2})/?") {
                 let expected_dir = PathBuf::from(path);
-                let (dir, filename) = split_path(expected_dir.clone());
+                prop_assert_eq!(split_path(expected_dir.clone()), None);
 
-                prop_assert_eq!(dir, expected_dir);
-                prop_assert_eq!(filename, None);
             }
         }
     }
