@@ -6,7 +6,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Margin},
-    style::{Color, Style, Modifier},
+    style::{Color, Modifier, Style},
     text::{Span, Spans},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
@@ -36,6 +36,34 @@ impl EditableArea {
         let prev_value = (num_value.overflowing_sub(1).0) % EditableArea::VARIANT_COUNT;
 
         num::FromPrimitive::from_usize(prev_value).unwrap()
+    }
+}
+
+enum ReplacementResult {
+    InvalidRegex,
+    EmptyRegex,
+    NoMatch,
+    Unchanged,
+    Replaced(String),
+}
+
+fn try_replace(text: &str, regex: &Option<Regex>, replacement: &str) -> ReplacementResult {
+    if let Some(regex) = regex.as_ref() {
+        if regex.as_str().is_empty() {
+            ReplacementResult::EmptyRegex
+        } else if !regex.is_match(text) {
+            ReplacementResult::NoMatch
+        } else {
+            let replaced = regex.replace(text, replacement);
+
+            if replacement == text {
+                ReplacementResult::Unchanged
+            } else {
+                ReplacementResult::Replaced(replaced.into())
+            }
+        }
+    } else {
+        ReplacementResult::InvalidRegex
     }
 }
 
@@ -116,6 +144,8 @@ impl App {
     }
 
     fn ui<B: Backend>(&self, frame: &mut Frame<B>) {
+        let re = Regex::new(&self.regex).ok();
+
         // editor and help areas
         let main_layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -141,6 +171,11 @@ impl App {
             }));
 
         let regex_input = Paragraph::new(self.regex.as_ref())
+            .style(if re.as_ref().is_some() {
+                Style::default()
+            } else {
+                Style::default().fg(Color::Red)
+            })
             .block(Block::default().title("Regex").borders(Borders::ALL));
         frame.render_widget(regex_input, input_layout[0]);
 
@@ -167,8 +202,6 @@ impl App {
             }
         }
 
-        let re = Regex::new(&self.regex).ok();
-
         let items: Vec<ListItem> = self
             .source_files
             .clone()
@@ -182,30 +215,18 @@ impl App {
 
                 let dir_str = parent.to_str().unwrap().to_owned() + "/";
 
-                // TODO: refactor with helper function returning enum of is_match/replace state
-                // and handle it with match {} block
-                if let Some(re) = re.as_ref() {
-                    if re.is_match(&name) {
-                        let dst_name: String = re.replace(&name, &self.replacement).into();
-
-                        if dst_name != name {
-                            Spans::from(vec![
-                                Span::styled(dir_str, dir_style),
-                                Span::styled(name, src_name_style),
-                                Span::raw("->"),
-                                Span::styled(dst_name, dst_name_style),
-                            ])
-                        } else {
-                            Spans::from(vec![
-                                Span::styled(dir_str, dir_style),
-                                Span::styled(name, dst_name_style),
-                            ])
-                        }
-                    } else {
-                        Spans::from(vec![Span::styled(dir_str, dir_style), Span::from(name)])
-                    }
-                } else {
-                    Spans::from(vec![Span::styled(dir_str, dir_style), Span::from(name)])
+                match try_replace(&name, &re, &self.replacement) {
+                    ReplacementResult::Replaced(dst_name) => Spans::from(vec![
+                        Span::styled(dir_str, dir_style),
+                        Span::styled(name, src_name_style),
+                        Span::raw("->"),
+                        Span::styled(dst_name, dst_name_style),
+                    ]),
+                    ReplacementResult::Unchanged => Spans::from(vec![
+                        Span::styled(dir_str, dir_style),
+                        Span::styled(name, dst_name_style),
+                    ]),
+                    _ => Spans::from(vec![Span::styled(dir_str, dir_style), Span::from(name)]),
                 }
             })
             .map(ListItem::new)
