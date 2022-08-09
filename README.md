@@ -8,6 +8,12 @@ Interactive rename tool
 
 [![demo](https://asciinema.org/a/3q2rKc6Z5WzmfHHuRVleA4AeG.svg)](https://asciinema.org/a/3q2rKc6Z5WzmfHHuRVleA4AeG)
 
+## Installation
+
+```shell
+cargo install irename
+```
+
 ## Usage
 
 ### Examples
