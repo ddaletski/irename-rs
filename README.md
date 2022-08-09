@@ -1,4 +1,9 @@
 # irename
+
+[![Crate](https://img.shields.io/crates/v/irename.svg)](https://crates.io/crates/irename)
+[![API](https://docs.rs/irename/badge.svg)](https://docs.rs/irename)
+
+
 Interactive rename tool
 
 [![demo](https://asciinema.org/a/3q2rKc6Z5WzmfHHuRVleA4AeG.svg)](https://asciinema.org/a/3q2rKc6Z5WzmfHHuRVleA4AeG)

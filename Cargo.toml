@@ -1,12 +1,11 @@
 [package]
 name = "irename"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 repository = "https://github.com/ddaletski/irename-rs"
 license = "MIT"
 description = "interactive file renaming tool"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["cli", "tui", "terminal", "regex"]
 
 [dependencies]
 anyhow = "1.0.60"
