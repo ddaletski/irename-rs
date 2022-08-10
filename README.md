@@ -36,6 +36,12 @@ Output of `dry-run` mode can be piped
 irename --dry-run some/dir/*.txt | parallel -n1
 ```
 
+If no positional args are provided, the files list is read from `stdin`
+```
+# find files using your favorite tool (e.g. `fd`) and pipe the file list into renamer
+fd \.rs | irename
+```
+
 **P.S.: The app will exit with an error if there are some conflicting names.
 It won't destruct your files as `GNU rename` does**
 
@@ -66,7 +72,7 @@ OPTIONS:
 
 ## TODO
 
-- [ ] Read input files paths from stdin if no positional args are supplied
+- [x] Read input files paths from stdin if no positional args are supplied
 - [ ] Files list scrolling with `Ctrl-d/Ctrl-u`
 - [ ] Highlight for conflicting names
 - [ ] Help side-pane

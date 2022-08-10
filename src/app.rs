@@ -1,13 +1,10 @@
 use crate::path_utils;
 
-use std::{path::PathBuf, sync::mpsc, thread, time::Duration};
+use std::{path::PathBuf, thread, time::Duration};
 
 use num_derive::{FromPrimitive, ToPrimitive};
 use regex::Regex;
-use termion::{
-    event::{Event, Key},
-    input::TermRead,
-};
+use termion::{event::Key, input::TermRead};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Margin},
