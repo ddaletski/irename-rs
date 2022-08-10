@@ -10,12 +10,12 @@ keywords = ["cli", "tui", "terminal", "regex"]
 [dependencies]
 anyhow = "1.0.60"
 clap = { version = "3.2.16", features = ["derive"] }
-crossterm = "0.24.0"
 num = "0.4.0"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 regex = "1.6.0"
-tui = "0.18.0"
+termion = "1.5.6"
+tui = { version = "0.18.0", features = ["termion"] }
 variant_count = "1.1.0"
 
 

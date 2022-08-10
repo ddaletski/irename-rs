@@ -2,12 +2,13 @@ use irename::app::{App, AppResult};
 use irename::cli::parse_args;
 
 use std::collections::HashSet;
+use std::path::PathBuf;
+use std::str::FromStr;
 
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use tui::{backend::CrosstermBackend, Terminal};
+use termion::raw::IntoRawMode;
+use termion::screen::AlternateScreen;
+
+use tui::{backend::TermionBackend, Terminal};
 
 /// check if all items of an iterator are unique
 fn unique<T>(mut items: T) -> bool
@@ -24,29 +25,31 @@ where
 fn main() -> anyhow::Result<()> {
     let args = parse_args();
 
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stderr = std::io::stderr();
-    crossterm::execute!(stderr, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stderr);
+    let files = {
+        if !args.files.is_empty() {
+            args.files.clone()
+        } else {
+            // if there are no files provided - read paths from stdin
+            std::io::stdin()
+                .lines()
+                .filter_map(|l| l.ok())
+                .filter_map(|s| PathBuf::from_str(&s).ok())
+                .collect()
+        }
+    };
+
+    let stderr = std::io::stderr().into_raw_mode()?;
+    let stderr = AlternateScreen::from(stderr);
+    let backend = TermionBackend::new(stderr);
     let mut terminal = Terminal::new(backend)?;
 
     // run the app
     let mut app = App::default()
-        .with_files(args.files)
+        .with_files(files)
         .with_regex(args.regex.unwrap_or_default())
         .with_replacement(args.replace.unwrap_or_default());
 
     let res = app.run(&mut terminal);
-
-    // restore terminal
-    disable_raw_mode()?;
-    crossterm::execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
 
     match res {
         Ok(result) => match result {

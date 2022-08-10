@@ -1,10 +1,13 @@
 use crate::path_utils;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::mpsc, thread, time::Duration};
 
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use num_derive::{FromPrimitive, ToPrimitive};
 use regex::Regex;
+use termion::{
+    event::{Event, Key},
+    input::TermRead,
+};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Margin},
@@ -113,32 +116,31 @@ impl App {
     }
 
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> std::io::Result<AppResult> {
+        let mut keys_iter = termion::async_stdin().keys();
+
         loop {
             terminal.draw(|f| self.ui(f))?;
 
-            if let Event::Key(KeyEvent { code, modifiers }) = crossterm::event::read()? {
-                // ctrl-c handler
-                if code == KeyCode::Char('c') && modifiers == KeyModifiers::CONTROL {
-                    return Ok(AppResult::Exit);
-                }
+            let edited_string = match self.active_area {
+                EditableArea::Regex => &mut self.regex,
+                EditableArea::Replace => &mut self.replacement,
+            };
 
-                let edited_string = match self.active_area {
-                    EditableArea::Regex => &mut self.regex,
-                    EditableArea::Replace => &mut self.replacement,
-                };
-
-                match code {
-                    KeyCode::Tab => {
-                        if modifiers == KeyModifiers::SHIFT {
-                            self.active_area = self.active_area.prev();
-                        } else {
-                            self.active_area = self.active_area.next();
-                        }
+            if let Some(Ok(key)) = keys_iter.next() {
+                match key {
+                    Key::Ctrl('c') => {
+                        return Ok(AppResult::Exit);
                     }
-                    KeyCode::Backspace => {
+                    Key::Char('\t') => {
+                        self.active_area = self.active_area.next();
+                    }
+                    Key::BackTab => {
+                        self.active_area = self.active_area.prev();
+                    }
+                    Key::Backspace => {
                         edited_string.pop();
                     }
-                    KeyCode::Enter => {
+                    Key::Char('\n') => {
                         let re = Regex::new(&self.regex).ok();
 
                         let move_pairs: Vec<(PathBuf, PathBuf)> = self
@@ -161,12 +163,13 @@ impl App {
 
                         return Ok(AppResult::MoveFiles(move_pairs));
                     }
-                    KeyCode::Char(ch) => {
+                    Key::Char(ch) => {
                         edited_string.push(ch);
                     }
                     _ => {}
                 }
             }
+            thread::sleep(Duration::from_millis(20));
         }
     }
 
