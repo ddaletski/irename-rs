@@ -10,7 +10,7 @@ use tui::{
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame, Terminal,
 };
 use variant_count::VariantCount;
@@ -229,7 +229,7 @@ impl App {
             }
         }
 
-        let items: Vec<ListItem> = self
+        let files_list: Vec<ListItem> = self
             .source_files
             .clone()
             .into_iter()
@@ -259,11 +259,27 @@ impl App {
             .collect();
 
         let files_view =
-            List::new(items).block(Block::default().title("Files").borders(Borders::ALL));
+            List::new(files_list).block(Block::default().title("Files").borders(Borders::ALL));
         frame.render_widget(files_view, editor_layout[1]);
 
-        let side_pane = Block::default().title("Help").borders(Borders::ALL);
-        frame.render_widget(side_pane, main_layout[1]);
+        let help_list: Vec<Spans> = vec![
+            ("Tab", "switch between regex and replacement areas"),
+            ("Enter", "execute renaming"),
+            ("Ctrl-c", "exit"),
+        ]
+        .into_iter()
+        .map(|(key, descr)| {
+            Spans::from(vec![
+                Span::styled(key, Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" - "),
+                Span::raw(descr),
+            ])
+        })
+        .collect();
+        let help_view = Paragraph::new(help_list)
+            .wrap(Wrap { trim: false })
+            .block(Block::default().title("Help").borders(Borders::ALL));
+        frame.render_widget(help_view, main_layout[1]);
     }
 }
 
