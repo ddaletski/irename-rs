@@ -47,19 +47,18 @@ It won't destruct your files as `GNU rename` does**
 
 ### Cli help output
 ```
-irename 0.1.0
-
 USAGE:
-    irename [OPTIONS] <FILES>...
+    irename [OPTIONS] [FILES]...
 
 ARGS:
-    <FILES>...
+    <FILES>...    files to rename. If none provided, the files list will be read from stdin
 
 OPTIONS:
-        --dry-run          only print shell commands w/o executing them
-    -h, --help             Print help information
-        --regex <REGEX>    Initial replacement regex
-    -V, --version          Print version information
+        --dry-run              only print shell commands w/o executing them
+    -h, --help                 Print help information
+        --regex <REGEX>        Initial regex
+        --replace <REPLACE>    Initial replacement string
+    -V, --version              Print version information
 ```
 
 
@@ -73,8 +72,8 @@ OPTIONS:
 ## TODO
 
 - [x] Read input files paths from stdin if no positional args are supplied
+- [x] Help side-pane
 - [ ] Files list scrolling with `Ctrl-d/Ctrl-u`
 - [ ] Highlight for conflicting names
-- [ ] Help side-pane
 - [ ] Full-path mode switch for editing the whole path instead of just filename
 - [ ] Docs
