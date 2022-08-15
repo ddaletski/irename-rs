@@ -38,9 +38,9 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let stderr = std::io::stderr().into_raw_mode()?;
-    let stderr = AlternateScreen::from(stderr);
-    let backend = TermionBackend::new(stderr);
+    let stdout = std::io::stdout().into_raw_mode()?;
+    let stdout = AlternateScreen::from(stdout);
+    let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
     // run the app
@@ -50,6 +50,7 @@ fn main() -> anyhow::Result<()> {
         .with_replacement(args.replace.unwrap_or_default());
 
     let res = app.run(&mut terminal);
+    drop(terminal); // restore terminal state
 
     match res {
         Ok(result) => match result {
