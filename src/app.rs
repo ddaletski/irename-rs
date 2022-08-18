@@ -323,7 +323,7 @@ impl App {
             }
         }
 
-        let files_list: Vec<ListItem> = self
+        let files_list: Vec<Spans> = self
             .source_files
             .clone()
             .into_iter()
@@ -345,11 +345,11 @@ impl App {
                     _ => Spans::from(vec![Span::styled(dir_str, dir_style), Span::from(name)]),
                 }
             })
-            .map(ListItem::new)
             .collect();
 
-        let files_view =
-            List::new(files_list).block(Block::default().title("Files").borders(Borders::ALL));
+        let files_view = Paragraph::new(files_list)
+            .wrap(Wrap { trim: false })
+            .block(Block::default().title("Files").borders(Borders::ALL));
         frame.render_widget(files_view, editor_layout[1]);
 
         let help_list: Vec<Spans> = vec![
