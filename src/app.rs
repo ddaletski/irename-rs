@@ -1,7 +1,14 @@
 use crate::path_utils;
 
-use std::{path::PathBuf, thread, time::Duration};
+use std::{
+    fmt::{format, Display},
+    path::PathBuf,
+    str::FromStr,
+    thread,
+    time::Duration,
+};
 
+use lazy_static::lazy_static;
 use num_derive::{FromPrimitive, ToPrimitive};
 use regex::Regex;
 use termion::{event::Key, input::TermRead};
@@ -14,6 +21,50 @@ use tui::{
     Frame, Terminal,
 };
 use variant_count::VariantCount;
+
+bitflags::bitflags! {
+    struct MatchFlags : u8 {
+        const NO_FLAGS = 0;
+        const GLOBAL = 1;
+        const ICASE = 2;
+    }
+}
+
+impl Display for MatchFlags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.contains(MatchFlags::GLOBAL) {
+            f.write_str("g")?;
+        }
+        if self.contains(MatchFlags::ICASE) {
+            f.write_str("i")?;
+        }
+
+        Ok(())
+    }
+}
+
+lazy_static! {
+    static ref FLAGS_REGEX: Regex = Regex::new("[gi]{0,2}").unwrap();
+}
+
+impl FromStr for MatchFlags {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if FLAGS_REGEX.is_match(s) {
+            let mut flags = MatchFlags::NO_FLAGS;
+            if s.contains("g") {
+                flags |= MatchFlags::GLOBAL;
+            }
+            if s.contains("i") {
+                flags |= MatchFlags::ICASE;
+            }
+            Ok(flags)
+        } else {
+            Err(format!("invalid regex flags: '{}'", s))
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, FromPrimitive, ToPrimitive, VariantCount)]
 enum EditableArea {
@@ -46,14 +97,34 @@ enum ReplacementResult {
     Replaced(String),
 }
 
-fn try_replace(text: &str, regex: &Option<Regex>, replacement: &str) -> ReplacementResult {
+fn compose_regex(regex_str: &str, flags: MatchFlags) -> Option<Regex> {
+    let flags_str = if flags.contains(MatchFlags::ICASE) {
+        "i"
+    } else {
+        ""
+    };
+    let composed_str = format!("(?{}:{})", flags_str, regex_str);
+
+    Regex::new(&composed_str).ok()
+}
+
+fn try_replace(
+    text: &str,
+    regex: &Option<Regex>,
+    replacement: &str,
+    global: bool,
+) -> ReplacementResult {
     if let Some(regex) = regex.as_ref() {
         if regex.as_str().is_empty() {
             ReplacementResult::EmptyRegex
         } else if !regex.is_match(text) {
             ReplacementResult::NoMatch
         } else {
-            let replaced = regex.replace(text, replacement);
+            let replaced = if global {
+                regex.replace_all(text, replacement)
+            } else {
+                regex.replace(text, replacement)
+            };
 
             if replaced == text {
                 ReplacementResult::Unchanged
@@ -72,10 +143,12 @@ pub enum AppResult {
 }
 
 pub struct App {
-    /// Current value of the regex input box
+    /// current value of the regex input box
     regex: String,
-    /// Current value of the replacement string box
+    /// current value of the replacement string box
     replacement: String,
+    /// match flags
+    flags: MatchFlags,
     /// active editing area where the cursor is
     active_area: EditableArea,
     /// source files to rename
@@ -87,6 +160,7 @@ impl Default for App {
         App {
             regex: String::new(),
             replacement: String::new(),
+            flags: MatchFlags::NO_FLAGS,
             active_area: EditableArea::Regex,
             source_files: Vec::new(),
         }
@@ -110,6 +184,10 @@ impl App {
     pub fn with_replacement(mut self, replacement: String) -> Self {
         self.replacement = replacement;
         self
+    }
+
+    fn is_global(&self) -> bool {
+        self.flags.contains(MatchFlags::GLOBAL)
     }
 
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> std::io::Result<AppResult> {
@@ -137,6 +215,12 @@ impl App {
                     Key::Backspace => {
                         edited_string.pop();
                     }
+                    Key::Ctrl('g') => {
+                        self.flags ^= MatchFlags::GLOBAL;
+                    }
+                    Key::Ctrl('r') => {
+                        self.flags ^= MatchFlags::ICASE;
+                    }
                     Key::Char('\n') => {
                         let re = Regex::new(&self.regex).ok();
 
@@ -146,7 +230,7 @@ impl App {
                             .into_iter()
                             .filter_map(path_utils::split_path)
                             .filter_map(|(parent, name)| {
-                                match try_replace(&name, &re, &self.replacement) {
+                                match try_replace(&name, &re, &self.replacement, self.is_global()) {
                                     ReplacementResult::Replaced(dst_name) => {
                                         let src_path = parent.join(name);
                                         let dst_path = parent.join(dst_name);
@@ -171,15 +255,15 @@ impl App {
     }
 
     fn ui<B: Backend>(&self, frame: &mut Frame<B>) {
-        let re = Regex::new(&self.regex).ok();
+        let re = compose_regex(&self.regex, self.flags);
 
         // editor and help areas
         let main_layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(85), Constraint::Min(15)])
+            .constraints([Constraint::Min(50), Constraint::Max(25)])
             .split(frame.size());
 
-        // editor area: regex, replacement, files list
+        // editor area: regex, replacement, flags, files list
         let editor_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(3), Constraint::Percentage(100)])
@@ -188,11 +272,20 @@ impl App {
                 horizontal: 0,
             }));
 
+        // regex and replacement inputs, flags
+        let top_row_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Min(0), Constraint::Length(7)])
+            .split(editor_layout[0].inner(&Margin {
+                vertical: 0,
+                horizontal: 0,
+            }));
+
         // regex and replacement inputs
         let input_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-            .split(editor_layout[0].inner(&Margin {
+            .split(top_row_layout[0].inner(&Margin {
                 vertical: 0,
                 horizontal: 0,
             }));
@@ -209,6 +302,10 @@ impl App {
         let replace_input = Paragraph::new(self.replacement.as_ref())
             .block(Block::default().title("Replacement").borders(Borders::ALL));
         frame.render_widget(replace_input, input_layout[1]);
+
+        let flags_view = Paragraph::new(self.flags.to_string())
+            .block(Block::default().title("Flags").borders(Borders::ALL));
+        frame.render_widget(flags_view, top_row_layout[1]);
 
         match self.active_area {
             EditableArea::Regex => {
@@ -241,7 +338,7 @@ impl App {
 
                 let dir_str = parent.to_str().unwrap().to_owned() + "/";
 
-                match try_replace(&name, &re, &self.replacement) {
+                match try_replace(&name, &re, &self.replacement, self.is_global()) {
                     ReplacementResult::Replaced(dst_name) => Spans::from(vec![
                         Span::styled(dir_str, dir_style),
                         Span::styled(name, src_name_style),
@@ -265,6 +362,8 @@ impl App {
         let help_list: Vec<Spans> = vec![
             ("Tab", "switch between regex and replacement areas"),
             ("Enter", "execute renaming"),
+            ("Ctrl-g", "'global' flag"),
+            ("Ctrl-r", "'icase' flag"),
             ("Ctrl-c", "exit"),
         ]
         .into_iter()
@@ -309,18 +408,19 @@ mod tests {
     }
 
     #[rstest]
-    #[case("a", None, "b", ReplacementResult::InvalidRegex)]
-    #[case("a", Regex::new("").ok(), "b", ReplacementResult::EmptyRegex)]
-    #[case("abc", Regex::new("bc").ok(), "bc", ReplacementResult::Unchanged)]
-    #[case("abc", Regex::new("b").ok(), "f", ReplacementResult::Replaced("afc".into()))]
-    #[case("abc", Regex::new("(ab)(.*)").ok(), "$2$1", ReplacementResult::Replaced("cab".into()))]
+    #[case("a", None, "b", false, ReplacementResult::InvalidRegex)]
+    #[case("a", Regex::new("").ok(), "b", false, ReplacementResult::EmptyRegex)]
+    #[case("abc", Regex::new("bc").ok(), "bc", false, ReplacementResult::Unchanged)]
+    #[case("abc", Regex::new("b").ok(), "f", false, ReplacementResult::Replaced("afc".into()))]
+    #[case("abc", Regex::new("(ab)(.*)").ok(), "$2$1", false, ReplacementResult::Replaced("cab".into()))]
     fn try_replace_works(
         #[case] text: &str,
         #[case] regex: Option<Regex>,
         #[case] replacement: &str,
+        #[case] global: bool,
         #[case] expected_result: ReplacementResult,
     ) {
-        let replacement_result = try_replace(text, &regex, replacement);
+        let replacement_result = try_replace(text, &regex, replacement, global);
         assert_eq!(replacement_result, expected_result);
     }
 }

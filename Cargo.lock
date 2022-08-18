@@ -303,7 +303,9 @@ name = "irename"
 version = "0.1.5"
 dependencies = [
  "anyhow",
+ "bitflags",
  "clap",
+ "lazy_static",
  "num",
  "num-derive",
  "num-traits",
