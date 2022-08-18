@@ -1,12 +1,6 @@
 use crate::path_utils;
 
-use std::{
-    fmt::{format, Display},
-    path::PathBuf,
-    str::FromStr,
-    thread,
-    time::Duration,
-};
+use std::{fmt::Display, path::PathBuf, str::FromStr, thread, time::Duration};
 
 use lazy_static::lazy_static;
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -17,7 +11,7 @@ use tui::{
     layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
 use variant_count::VariantCount;
@@ -53,10 +47,10 @@ impl FromStr for MatchFlags {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if FLAGS_REGEX.is_match(s) {
             let mut flags = MatchFlags::NO_FLAGS;
-            if s.contains("g") {
+            if s.contains('g') {
                 flags |= MatchFlags::GLOBAL;
             }
-            if s.contains("i") {
+            if s.contains('i') {
                 flags |= MatchFlags::ICASE;
             }
             Ok(flags)
@@ -403,8 +397,13 @@ mod tests {
     #[rstest]
     #[case("a", None, "b", false, ReplacementResult::InvalidRegex)]
     #[case("abc", Regex::new("bc").ok(), "bc", false, ReplacementResult::Unchanged)]
-    #[case("abc", Regex::new("b").ok(), "f", false, ReplacementResult::Replaced("afc".into()))]
     #[case("abc", Regex::new("(ab)(.*)").ok(), "$2$1", false, ReplacementResult::Replaced("cab".into()))]
+    // case vs ignore case
+    #[case("aBc", Regex::new("abc").ok(), "", false, ReplacementResult::NoMatch)]
+    #[case("aBc", Regex::new("(?i:abc)").ok(), "", false, ReplacementResult::Replaced("".into()))]
+    // non-global vs global 
+    #[case("abac", Regex::new("a").ok(), "d", false, ReplacementResult::Replaced("dbac".into()))]
+    #[case("abac", Regex::new("a").ok(), "d", true, ReplacementResult::Replaced("dbdc".into()))]
     fn try_replace_works(
         #[case] text: &str,
         #[case] regex: Option<Regex>,
