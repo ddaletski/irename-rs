@@ -73,6 +73,7 @@ OPTIONS:
 
 - [x] Read input files paths from stdin if no positional args are supplied
 - [x] Help side-pane
+- [x] Match flags
 - [ ] Files list scrolling with `Ctrl-d/Ctrl-u`
 - [ ] Highlight for conflicting names
 - [ ] Full-path mode switch for editing the whole path instead of just filename
