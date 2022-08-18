@@ -91,7 +91,6 @@ impl EditableArea {
 #[derive(Debug, PartialEq)]
 enum ReplacementResult {
     InvalidRegex,
-    EmptyRegex,
     NoMatch,
     Unchanged,
     Replaced(String),
@@ -115,9 +114,7 @@ fn try_replace(
     global: bool,
 ) -> ReplacementResult {
     if let Some(regex) = regex.as_ref() {
-        if regex.as_str().is_empty() {
-            ReplacementResult::EmptyRegex
-        } else if !regex.is_match(text) {
+        if !regex.is_match(text) {
             ReplacementResult::NoMatch
         } else {
             let replaced = if global {
@@ -345,10 +342,6 @@ impl App {
                         Span::raw("->"),
                         Span::styled(dst_name, dst_name_style),
                     ]),
-                    ReplacementResult::Unchanged => Spans::from(vec![
-                        Span::styled(dir_str, dir_style),
-                        Span::styled(name, dst_name_style),
-                    ]),
                     _ => Spans::from(vec![Span::styled(dir_str, dir_style), Span::from(name)]),
                 }
             })
@@ -409,7 +402,6 @@ mod tests {
 
     #[rstest]
     #[case("a", None, "b", false, ReplacementResult::InvalidRegex)]
-    #[case("a", Regex::new("").ok(), "b", false, ReplacementResult::EmptyRegex)]
     #[case("abc", Regex::new("bc").ok(), "bc", false, ReplacementResult::Unchanged)]
     #[case("abc", Regex::new("b").ok(), "f", false, ReplacementResult::Replaced("afc".into()))]
     #[case("abc", Regex::new("(ab)(.*)").ok(), "$2$1", false, ReplacementResult::Replaced("cab".into()))]
