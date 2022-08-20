@@ -67,6 +67,8 @@ OPTIONS:
 - `Tab` - switch between `regex` and `replacement` text input areas
 - `Enter` - execute renaming
 - `Ctrl-c` - exit
+- `Ctrl-g` - toggle 'global' flag
+- `Ctrl-r` - toggle 'ignore case' flag
 
 
 ## TODO
